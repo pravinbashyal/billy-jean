@@ -18,7 +18,7 @@ The window has two parts. The left side is a form with the panels Sender, Bill t
 ## Build and run from source
 
 ```bash
-git clone https://github.com/pravinbashyal/billing.git
+git clone https://github.com/pravinbashyal/billy-jean.git
 cd billing
 cargo run --release
 ```
@@ -79,7 +79,7 @@ Without this file, every build uses the stock crates from crates.io, which is wh
 
 ## Install via Homebrew
 
-Billy Jean is distributed through a personal (non-official) Homebrew tap, [pravinbashyal/homebrew-billy-jean](https://github.com/pravinbashyal/homebrew-billy-jean), which tracks this project's [GitHub Releases](https://github.com/pravinbashyal/billing/releases).
+Billy Jean is distributed through a personal (non-official) Homebrew tap, [pravinbashyal/homebrew-billy-jean](https://github.com/pravinbashyal/homebrew-billy-jean), which tracks this project's [GitHub Releases](https://github.com/pravinbashyal/billy-jean/releases).
 
 ```bash
 brew tap pravinbashyal/billy-jean
@@ -102,7 +102,7 @@ A plain `brew uninstall` keeps your saved sender and bank details. `brew uninsta
 
 ## Unsigned build
 
-Tagged releases (see [Releases](https://github.com/pravinbashyal/billing/releases)) publish a `.dmg` for each architecture, built by CI. The build is **not code-signed or notarized**, because the project has no Apple Developer account. If you download the `.dmg` directly, or install through Homebrew, and macOS Gatekeeper reports the app as "damaged" or refuses to open it:
+Tagged releases (see [Releases](https://github.com/pravinbashyal/billy-jean/releases)) publish a `.dmg` for each architecture, built by CI. The build is **not code-signed or notarized**, because the project has no Apple Developer account. If you download the `.dmg` directly, or install through Homebrew, and macOS Gatekeeper reports the app as "damaged" or refuses to open it:
 
 - On macOS 15 (Sequoia) and later, open **System Settings → Privacy & Security**, scroll down to the notice about the blocked app, click **Open Anyway**, and confirm. This is only needed once.
 - On older macOS versions, right-click (or Control-click) **Billy Jean** in `/Applications` and choose **Open**.

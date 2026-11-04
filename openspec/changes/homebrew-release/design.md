@@ -74,7 +74,7 @@ Alternative: a separate Intel runner job (`macos-15-intel`) adds a matrix and an
 | App bundle / display / menu name | `Billy Jean.app`, "Billy Jean" | new |
 | Bundle ID | `com.pravinbashyal.billy-jean` | new (there was no bundle before) |
 | Cask token / tap | `billy-jean` / `pravinbashyal/homebrew-billy-jean` | new |
-| GitHub source repo | `pravinbashyal/billing` | new |
+| GitHub source repo | `pravinbashyal/billy-jean` | new |
 | Crate, lib and binary (`CFBundleExecutable`) | `billing` | unchanged |
 | Config dir (`ProjectDirs`) | `~/Library/Application Support/com.pravinbashyal.billing` | unchanged |
 
@@ -140,7 +140,7 @@ The pdf-tools flow needs a tool that (1) computes the semver bump from Conventio
 
 ### D8. Cask shape
 Copied from `Casks/pdf-tools.rb`:
-- `version`, then `on_arm`/`on_intel` blocks, each with `sha256` followed by a `url "https://github.com/pravinbashyal/billing/releases/download/v#{version}/Billy-Jean-#{version}-<arch>.dmg"`. The `sha256`-then-`url` order inside each block is what the update regex relies on.
+- `version`, then `on_arm`/`on_intel` blocks, each with `sha256` followed by a `url "https://github.com/pravinbashyal/billy-jean/releases/download/v#{version}/Billy-Jean-#{version}-<arch>.dmg"`. The `sha256`-then-`url` order inside each block is what the update regex relies on.
 - `name "Billy Jean"`, `desc`, `homepage`.
 - `depends_on :macos` (explicit floor is flagged redundant by `brew style`; `LSMinimumSystemVersion` 11.0 enforces it), matching `LSMinimumSystemVersion` 11.0.
 - `app "Billy Jean.app"`, the same unsigned-build caveat, and `zap trash: "~/Library/Application Support/com.pravinbashyal.billing"`.
@@ -173,7 +173,7 @@ Trade-off: the per-task commit history the five-role workflow produced is not pu
 
 1. Apply the code tasks (manifest, docs, packaging, versioning, workflows, tap files) on a branch off `main` after `add-invoice-builder` merges, then merge.
 2. Build the new repository with a single initial commit (D9) and verify.
-3. Create the public `pravinbashyal/billing` and `pravinbashyal/homebrew-billy-jean` repos, push, and set `HOMEBREW_TAP_TOKEN`.
+3. Create the public `pravinbashyal/billy-jean` and `pravinbashyal/homebrew-billy-jean` repos, push, and set `HOMEBREW_TAP_TOKEN`.
 4. Run `scripts/release.sh --version 1.0.0`, open and merge the release PR, and watch the tag, the release and the tap update. Then install with `brew` on this Mac and launch.
 
 Rollback: before step 3, delete the new directory and redo step 2; the old repository is untouched. After publishing, a bad release is fixed forward with a patch release. The tap can be reverted to the previous Cask commit.

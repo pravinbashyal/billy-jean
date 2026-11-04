@@ -4,7 +4,7 @@ version = "1.0.0"
 edition = "2024"
 license = "MIT"
 description = "Billy Jean: a desktop invoice builder that exports PDFs."
-repository = "https://github.com/pravinbashyal/billing"
+repository = "https://github.com/pravinbashyal/billy-jean"
 
 [features]
 # Dev tooling only: publishes a semantic tree of the editor to the `gpui-mcp` stdio

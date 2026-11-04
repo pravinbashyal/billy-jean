@@ -121,7 +121,7 @@ jobs:
       # editing. Requires a `HOMEBREW_TAP_TOKEN` repo secret: a token with write
       # access to homebrew-billy-jean (a fine-grained PAT scoped to just that repo,
       # with Contents: Read and write, is recommended over a classic PAT). Set it
-      # at https://github.com/pravinbashyal/billing/settings/secrets/actions.
+      # at https://github.com/pravinbashyal/billy-jean/settings/secrets/actions.
       - name: Checkout homebrew-billy-jean tap
         uses: actions/checkout@v4
         with:
