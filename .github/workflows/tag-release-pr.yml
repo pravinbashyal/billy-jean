@@ -1,0 +1,50 @@
+name: Tag Release PR
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  tag:
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Create and push release tag
+        run: |
+          set -euo pipefail
+
+          VERSION="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "billing") | .version')"
+          if [ -z "$VERSION" ]; then
+            echo "Could not read the billing package version from Cargo.toml."
+            exit 1
+          fi
+          TAG="v${VERSION}"
+
+          if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists; refusing to overwrite or re-push."
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG"
+          git push origin "$TAG"
+
+          gh workflow run release.yml --ref main -f tag="$TAG"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

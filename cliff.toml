@@ -1,0 +1,53 @@
+# git-cliff configuration for CHANGELOG.md. scripts/release.sh uses it for two things:
+# `git cliff --bumped-version` (the next semantic version) and
+# `git cliff --unreleased --tag vX.Y.Z --prepend CHANGELOG.md` (the new section).
+#
+# Conventional Commits preset. filter_unconventional drops commits that do not follow
+# the convention (the pre-1.0 "<change>: task N.N ..." history), so they reach neither
+# the changelog nor the version calculation.
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes to this project are documented in this file.
+It is generated from Conventional Commits by `scripts/release.sh`.
+
+"""
+body = """
+{% if version %}\
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## [unreleased]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim | upper_first }}
+{% for commit in commits %}
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{% if commit.breaking %}**BREAKING:** {% endif %}{{ commit.message | upper_first }}\
+{% endfor %}
+{% endfor %}
+"""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+commit_parsers = [
+  { message = "^chore\\(release\\)", skip = true },
+  { message = "^feat", group = "Features" },
+  { message = "^fix", group = "Bug Fixes" },
+  { message = "^perf", group = "Performance" },
+  { message = "^refactor", group = "Refactoring" },
+  { message = "^docs", group = "Documentation" },
+  { message = "^test", group = "Tests" },
+  { message = "^ci", group = "CI" },
+  { message = "^build", group = "Build" },
+  { message = "^chore", group = "Miscellaneous" },
+  # Any other type (for example the pre-1.0 "add-invoice-builder: task ..." commits) is
+  # not part of the changelog. The rules above match first.
+  { message = ".*", skip = true },
+]
+# Only release tags (v1.0.0, v1.1.0, ...) count as the previous version.
+tag_pattern = "v[0-9].*"
+sort_commits = "oldest"

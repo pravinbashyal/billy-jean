@@ -1,0 +1,41 @@
+[package]
+name = "billing"
+version = "1.0.0"
+edition = "2024"
+license = "MIT"
+description = "Billy Jean: a desktop invoice builder that exports PDFs."
+repository = "https://github.com/pravinbashyal/billing"
+
+[features]
+# Dev tooling only: publishes a semantic tree of the editor to the `gpui-mcp` stdio
+# server (crates.io `gpui-mcp`) and executes its bounded UI actions. Off by default;
+# `cargo build --features gpui-mcp` compiles the bridge. test-support provides the
+# window `render_to_image` used for screenshots.
+gpui-mcp = ["dep:gpui-mcp", "dep:async-channel", "gpui/test-support", "gpui_platform/test-support"]
+# Dev tooling only, needs the patched gpui-pre fork (untracked .cargo/config.toml, design D5).
+# Enables the window driver calls (synthesized focus and typed text) that the stock
+# gpui-pre 0.3.11 does not provide. Off by default, so the stock build still compiles.
+gpui-driver = []
+
+[dependencies]
+genpdf = "0.2.0"
+gpui-component = "0.9.0"
+# Calendar dates for the DatePicker (task 4.2). Already in the lock file via gpui-component.
+chrono = "0.4"
+gpui = { package = "gpui-pre", version = "=0.3.11" }
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.11", features = ["runtime_shaders", "font-kit"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+directories = "6.0.0"
+# gpui-mcp bridge (crates.io). Framework-neutral: we publish semantic nodes and
+# execute its bounded actions ourselves. Optional; see the `gpui-mcp` feature.
+gpui-mcp = { version = "0.1.0", optional = true }
+# The action channel gpui-mcp's InspectionServer sends on; pinned to its ^2 requirement.
+async-channel = { version = "2", optional = true }
+hayro = "0.9"
+# Frame buffers for the preview's GPUI `RenderImage` (task 5.1). Already in the lock
+# file through gpui-pre; no default features, so nothing new is compiled.
+image = { version = "0.25", default-features = false }
+
+[dev-dependencies]
+png = "0.17"

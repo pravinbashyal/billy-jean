@@ -1,0 +1,181 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build/release (e.g. v1.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  MACOSX_DEPLOYMENT_TARGET: '11.0'
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - name: Resolve tag
+        id: resolve_tag
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="${INPUT_TAG:-$GITHUB_REF_NAME}"
+          if [[ ! "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "error: tag '$TAG' is not of the form vX.Y.Z" >&2
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ steps.resolve_tag.outputs.tag }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Verify tag matches Cargo.toml version
+        env:
+          TAG: ${{ steps.resolve_tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG_VERSION="${TAG#v}"
+          CARGO_VERSION="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "billing") | .version')"
+          if [ -z "$CARGO_VERSION" ]; then
+            echo "error: could not read the billing package version from Cargo.toml" >&2
+            exit 1
+          fi
+          if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
+            echo "Tag version ($TAG_VERSION) does not match Cargo.toml version ($CARGO_VERSION)"
+            exit 1
+          fi
+
+      - name: Bundle Billy Jean (arm64)
+        env:
+          VERSION: ${{ steps.resolve_tag.outputs.version }}
+        run: scripts/bundle-macos.sh aarch64-apple-darwin "$VERSION"
+
+      - name: Bundle Billy Jean (x86_64)
+        env:
+          VERSION: ${{ steps.resolve_tag.outputs.version }}
+        run: scripts/bundle-macos.sh x86_64-apple-darwin "$VERSION"
+
+      - name: Verify app signatures and architectures
+        env:
+          VERSION: ${{ steps.resolve_tag.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          # Mount each published image read-only and check the app inside it,
+          # which is the exact bundle users will receive.
+          check_image() {
+            local arch="$1" expected_arch="$2"
+            local dmg="dist/Billy-Jean-${VERSION}-${arch}.dmg"
+            local mnt="$RUNNER_TEMP/mount-${arch}"
+            local app="$mnt/Billy Jean.app"
+
+            mkdir -p "$mnt"
+            hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$dmg" >/dev/null
+            codesign --verify --deep --strict "$app"
+            local actual_arch
+            actual_arch="$(lipo -archs "$app/Contents/MacOS/billing")"
+            if [ "$actual_arch" != "$expected_arch" ]; then
+              echo "error: $dmg contains '$actual_arch', expected '$expected_arch'" >&2
+              exit 1
+            fi
+            hdiutil detach "$mnt" >/dev/null
+          }
+
+          check_image arm64 arm64
+          check_image x86_64 x86_64
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.resolve_tag.outputs.tag }}
+          files: dist/*.dmg
+          fail_on_unmatched_files: true
+          body: |
+            This build is **not code-signed or notarized**.
+
+            If you download the `.dmg` directly (i.e. not via Homebrew), macOS Gatekeeper will likely refuse to open it with a "damaged" or "unidentified developer" warning. On macOS 15 (Sequoia) and later, open **System Settings → Privacy & Security**, scroll down to the notice about the blocked app, and click **Open Anyway** (confirm once). On older macOS versions, right-click (or Control-click) "Billy Jean" in `/Applications` and choose **Open** instead.
+
+            If neither shows an override option (the "move to Trash" variant of the warning), run `xattr -dr com.apple.quarantine "/Applications/Billy Jean.app"` in Terminal instead.
+
+      # Auto-update the Homebrew Cask in the pravinbashyal/homebrew-billy-jean tap
+      # so `brew upgrade --cask billy-jean` picks up this release without manual
+      # editing. Requires a `HOMEBREW_TAP_TOKEN` repo secret: a token with write
+      # access to homebrew-billy-jean (a fine-grained PAT scoped to just that repo,
+      # with Contents: Read and write, is recommended over a classic PAT). Set it
+      # at https://github.com/pravinbashyal/billing/settings/secrets/actions.
+      - name: Checkout homebrew-billy-jean tap
+        uses: actions/checkout@v4
+        with:
+          repository: pravinbashyal/homebrew-billy-jean
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-billy-jean
+
+      - name: Update Homebrew Cask formula
+        env:
+          VERSION: ${{ steps.resolve_tag.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          ARM_DMG="dist/Billy-Jean-${VERSION}-arm64.dmg"
+          X64_DMG="dist/Billy-Jean-${VERSION}-x86_64.dmg"
+          ARM_SHA="$(shasum -a 256 "$ARM_DMG" | awk '{print $1}')"
+          X64_SHA="$(shasum -a 256 "$X64_DMG" | awk '{print $1}')"
+
+          python3 - "$VERSION" "$ARM_SHA" "$X64_SHA" homebrew-billy-jean/Casks/billy-jean.rb <<'PYEOF'
+          import re
+          import sys
+
+          version, arm_sha, x64_sha, path = sys.argv[1:5]
+
+          with open(path) as f:
+              content = f.read()
+
+          content, n = re.subn(r'version "[^"]*"', f'version "{version}"', content, count=1)
+          if n != 1:
+              raise SystemExit(f"expected exactly 1 replacement for version, got {n}")
+
+          def replace_block_sha(content, block_name, new_sha):
+              pattern = re.compile(
+                  r'(on_' + block_name + r' do\n\s*sha256 ")[a-f0-9]{64}(")'
+              )
+              new_content, count = pattern.subn(r'\g<1>' + new_sha + r'\g<2>', content)
+              if count != 1:
+                  raise SystemExit(f"expected exactly 1 replacement for on_{block_name} sha256, got {count}")
+              return new_content
+
+          content = replace_block_sha(content, "arm", arm_sha)
+          content = replace_block_sha(content, "intel", x64_sha)
+
+          with open(path, "w") as f:
+              f.write(content)
+          PYEOF
+
+          cd homebrew-billy-jean
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/billy-jean.rb
+          if git diff --cached --quiet; then
+            echo "No changes to Cask formula; skipping commit."
+          else
+            git commit -m "Update billy-jean to v${VERSION}"
+            git push origin main
+          fi
