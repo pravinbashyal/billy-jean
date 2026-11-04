@@ -8,6 +8,7 @@ It is generated from Conventional Commits by `scripts/release.sh`.
 ### Documentation
 
 - Point repository URLs at pravinbashyal/billy-jean
+- Write README for end users and move developer docs to DEVELOPMENT.md
 
 ### Features
 
